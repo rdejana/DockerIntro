@@ -109,10 +109,11 @@ Run the command `docker run --name helloWorld --rm hello-world` and then when it
 When done, you can remove the image with the command `docker rmi hello-world:latest`.  An image may only be deleted when there are no containers using that image.
 
 ### Docker command recap
-Command | Description
-docker ps | Lists all running containers
-docker ps -a | Lists all containers
-docker images | Lista all local images
-docker run  <imageName> | Run an image as a container
-docker run --name <name> <imageName> | Run an image as a container, using the specified name for the container.
-docker run --rm <imageName> | Run an image as a conatiner and automatically delete it when it exits.
+| Command | Description |
+| --- | --------- |
+| docker ps | Lists all running containers |
+| docker ps -a | Lists all containers |
+| docker images | Lista all local images |
+| docker run  <imageName> | Run an image as a container |
+| docker run --name <name> <imageName> | Run an image as a container, using the specified name for the container. |
+| docker run --rm <imageName> | Run an image as a conatiner and automatically delete it when it exits. |
