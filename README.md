@@ -459,10 +459,118 @@ root@nano:/# ./nbody
 This will display a N-body simulation, running in a container and displaying on your UI.
 
 ## Part 2: TensorFlow
+You'll start by pulling the offical Jetson TensorFlow image with the command `docker pull nvcr.io/nvidia/l4t-tensorflow:r32.4.4-tf2.3-py3`.  Details on this image and other images can be found at Nvidia NGC registry, https://ngc.nvidia.com/catalog/containers/nvidia:l4t-tensorflow.  Now start the container `docker run -it --rm  --network host nvcr.io/nvidia/l4t-tensorflow:r32.4.4-tf1.15-py3`.
+
+Once you have the prompt, start python3.  From the python3 prompt, enter the following
+ ```
+ >>> import tensorflow as tf
+ >>> print("Num GPUs Available: ", len(tf.config.experimental.list_physical_devices('GPU')))
+ Num GPUs Available:  1
+ ```
+You've now used your Nvidia GPU with Tensor from a container!  Other images form Nvidia includ PyTorch with GPU support along with images with scipy and Panadas pre-installed.  
 
 
-# Kuberenetes
+# NX and Kuberenetes
 
 ## Part 1: Install and verify Kubernetes
+This is based on https://thenewstack.io/tutorial-deploying-tensorflow-models-at-the-edge-with-nvidia-jetson-nano-and-k3s/.
+
+You'll first want to make sure that the default runtime for Docker is set to nvidia.  Confirm that the file `/etc/docker/daemon.json` looks like:
+```
+{
+    "runtimes": {
+        "nvidia": {
+            "path": "nvidia-container-runtime",
+            "runtimeArgs": []
+        }
+    },
+ 
+    "default-runtime": "nvidia"
+}
+
+```
+You are going to use a slimmed down Kubernetes called K3s.  
+Runn the following:
+```
+mkdir $HOME/.kube/
+curl -sfL https://get.k3s.io | sh -s - --docker --write-kubeconfig-mode 644 --write-kubeconfig $HOME/.kube/config
+```
+After a few minutes, you'll have Kubernetes up and running.
+```
+kubectl get nodes
+NAME   STATUS   ROLES                  AGE   VERSION
+nx     Ready    control-plane,master   27s   v1.20.0+k3s2
+```
+
+You will create a simple deployment of a Nginx web server.  Create a file named nginx.yaml with the following content:
+```
+apiVersion: apps/v1 # for versions before 1.9.0 use apps/v1beta2
+kind: Deployment
+metadata:
+  name: nginx-deployment
+spec:
+  selector:
+    matchLabels:
+      app: nginx
+  replicas: 1 # tells deployment to run 1 pod matching the template
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:1.14.2
+        ports:
+        - containerPort: 80
+
+```
+
+This file describes what we want running.  A single replica of a Nginx container, which is listening on port 80.
+
+Now run the command `kubectl apply -f nginx.yaml`.  This will create the deployment.  Run the command `kubectl get pods` to watch the containers start up.  Once they are running, run the command `kubectl expose deployment nginx-deployment --port=80 --type=NodePort` to create a service, or a means of accessing, for you deployment.  A NodePort service means we are using a "random" port on the the host.  Run the command `kubectl get service nginx-deployment` to list the service.  Notice the PORT section, and look for `80:####` where `####` is the port your nginx container is exposed on.
+
+To clean up, run `kubectl delete service nginx-deployment` and `kubectl delete deployment nginx-deployment`.  
+
+### Stopping and Starting Kubernetes
+Kubernetes is installed as a systemd service and is configured to start automatically.  You can disable this with the following command:
+```
+sudo systemctl disable k3s
+```
+The service can be started with the command:
+```
+sudo systemctl start k3s
+```
+and stopped with:
+```
+sudo systemctl stop k3s
+```
+If k3s doesn't stop cleanling, rebooting will be needed.
+
 
 ## Part 2: Kubernetes and GPU.
+Start Kubernetes if needed.  On your NX, create a file named tf.yaml with the following content:
+```
+apiVersion: v1
+kind: Pod
+metadata:
+  name: tensorflow
+spec:
+  containers:
+  - name: tf
+    image: nvcr.io/nvidia/l4t-tensorflow:r32.4.4-tf2.3-py3
+    command: [ "/bin/bash", "-c", "--" ]
+    args: [ "while true; do sleep 30; done;" ]
+```
+This will create a simple pod running the the bash shell.
+
+Run `kubectl apply -f tf2.yaml` to create the pod.  Now run `kubectl get pods` and verify that the pod is running.  This may take some time if the image needs to be downloaded.  You'll now "shell" into the container with the command `kubectl exec -it tensorflow -- python3`.
+
+From the prompt, enter the following:
+ ```
+ >>> import tensorflow as tf
+ >>> print("Num GPUs Available: ", len(tf.config.experimental.list_physical_devices('GPU')))
+ Num GPUs Available:  1
+ ```
+
+ Exit python and delete your pod with the command `kubectl delete pod tensorflow`  You may now stop Kubernetes or reboot as needed.
