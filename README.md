@@ -299,4 +299,170 @@ replacing `<your HTML directory>` with your actual directory.  Access your page 
 Stop your container.
 
 ## Part 6. Building and sharing your own custom image.
-Using exiting containers is great, but the Docker also allows you to create and share your own images.  
+Using exiting containers is great, but the Docker also allows you to create and share your own images.  Building your own image starts with a Dockerfile.  In this example, we'll use the following Dockerfile
+```
+# Using ubuntu 18.04 as base image
+FROM ubuntu:18.04
+# update the base image
+RUN apt-get update && apt-get -y update
+# install 
+RUN apt-get install python3-pip python3-dev build-essential nodejs -y
+# make python3 -> python
+RUN ln -s /usr/bin/python3 /usr/local/bin/python 
+# update pip
+RUN pip3 install --upgrade pip
+# install jupyter and lab
+RUN pip3 install jupyter
+RUN pip3 install jupyterlab
+# set our workdir
+WORKDIR /src/notebooks
+COPY notebooks/simple.ipynb ./
+# Setup which command to run...
+# This runs jup notebook 
+CMD ["jupyter", "notebook", "--port=8888", "--no-browser", "--ip=0.0.0.0", "--allow-root"]
+# This runs jup lab
+#CMD ["jupyter", "lab", "--port=8888", "--no-browser", "--ip=0.0.0.0", "--allow-root"]
+```
+This file is located in this repository under the directory `docker`.
+
+The `FROM` tells Docker which base image we are using.  In this case, you are using the ubuntu 18.04 base image.
+
+`RUN` runs a command in the container.  The run commands here are split for readablity; best practive would be combine them where it makes sense.  Here we are running a set of commands that update the base image, install python3 and install jupyter.  
+
+`WORKDIR` sets up where the container is running from.  The directory is created if it doesn't already exist.
+
+`COPY` enables the copying of files from host to the container.
+
+`CMD` is the command that the container will run at start up.  In this example, it'll start up a notebook.
+
+`#` is a comment.  Comments are not executed by Docker.
+
+To build an image, you'll use the build command.  You'll want to clone this repo and change to the docker directory.
+
+Run `docker build -t myimage .`.  This will create an image named myimage and use the default Dockerfile.  You'll see output like:
+```
+ docker build --no-cache -t myimage .
+Sending build context to Docker daemon  4.608kB
+Step 1/10 : FROM ubuntu:18.04
+ ---> 2c047404e52d
+Step 2/10 : RUN apt-get update && apt-get -y update
+ ---> Running in 076f304f5fa0
+Get:1 http://security.ubuntu.com/ubuntu bionic-security InRelease [88.7 kB]
+Get:2 http://archive.ubuntu.com/ubuntu bionic InRelease [242 kB]
+Get:3 http://security.ubuntu.com/ubuntu bionic-security/restricted amd64 Packages [247 kB]
+Get:4 http://security.ubuntu.com/ubuntu bionic-security/main amd64 Packages [1845 kB]
+Get:5 http://security.ubuntu.com/ubuntu bionic-security/multiverse amd64 Packages [14.9 kB]
+Get:6 http://security.ubuntu.com/ubuntu bionic-security/universe amd64 Packages [1376 kB]
+Get:7 http://archive.ubuntu.com/ubuntu bionic-updates InRelease [88.7 kB]
+Get:8 http://archive.ubuntu.com/ubuntu bionic-backports InRelease [74.6 kB]
+Get:9 http://archive.ubuntu.com/ubuntu bionic/main amd64 Packages [1344 kB]
+Get:10 http://archive.ubuntu.com/ubuntu bionic/multiverse amd64 Packages [186 kB]
+Get:11 http://archive.ubuntu.com/ubuntu bionic/restricted amd64 Packages [13.5 kB]
+Get:12 http://archive.ubuntu.com/ubuntu bionic/universe amd64 Packages [11.3 MB]
+Get:13 http://archive.ubuntu.com/ubuntu bionic-updates/main amd64 Packages [2272 kB]
+...
+Removing intermediate container 076f304f5fa0
+ ---> c60341f64168
+Step 3/10 : RUN apt-get install python3-pip python3-dev build-essential nodejs -y
+ ---> Running in 7c6214716125
+Reading package lists...
+Building dependency tree...
+Reading state information...
+The following additional packages will be installed:
+  binutils binutils-common binutils-x86-64-linux-gnu ca-certificates cpp cpp-7
+  dbus dh-python dirmngr dpkg-dev fakeroot file g++ g++-7 gcc gcc-7 gcc-7-base
+  gir1.2-glib-2.0 gnupg gnupg-l10n gnupg-utils gpg gpg-agent gpg-wks-client
+  gpg-wks-server gpgconf gpgsm libalgorithm-diff-perl
+  libalgorithm-diff-xs-perl libalgorithm-merge-perl libapparmor1 libasan4
+  libasn1-8-heimdal libassuan0 libatomic1 libbinutils libc-ares2 libc-dev-bin
+  -info_1.9-2_amd64.deb ...
+
+...
+Step 8/10 : WORKDIR /src/notebooks
+ ---> Running in 8bac2a0a6c5c
+Removing intermediate container 8bac2a0a6c5c
+ ---> d6e882fd43c4
+Step 9/10 : COPY notebooks/simple.ipynb ./
+ ---> df233fcc6b7c
+Step 10/10 : CMD ["jupyter", "notebook", "--port=8888", "--no-browser", "--ip=0.0.0.0", "--allow-root"]
+ ---> Running in ea673ebdbbed
+Removing intermediate container ea673ebdbbed
+ ---> d28014cd5559
+Successfully built d28014cd5559
+Successfully tagged myimage:latest
+skywalker:docker rdejana$ 
+```
+
+Go ahead and launch the image with the command `docker run -ti -p 8888:8888 myimage`.  You'll see some info with the token value displayed to stdout.  Use that to login into your notebook.  You can them open simple.ipynb and run it.
+
+You'll now push this image to DockerHub.  Run the command `docker tag myimage <yourdockerid>/myjupyter`, replacing `<yourdockerid>` with your actual value.  For me, it would be `docker tag myimage rdejana/myjupyter`.  You'll them push the image into DockerHub; `docker push rdejana/myjupyter`.
+```
+skywalker:demo rdejana$ docker tag myimage rdejana/myjupyter
+skywalker:demo rdejana$ docker push rdejana/myjupyter
+Using default tag: latest
+The push refers to repository [docker.io/rdejana/myjupyter]
+54601f934e1c: Mounted from rdejana/mytestimagefordocker 
+4076f41a98fa: Mounted from rdejana/mytestimagefordocker 
+3dc3b21f8df2: Mounted from rdejana/mytestimagefordocker 
+62db2e220080: Mounted from rdejana/mytestimagefordocker 
+aacaab36a3af: Mounted from rdejana/mytestimagefordocker 
+927cc003fdc7: Mounted from rdejana/mytestimagefordocker 
+a3e6098f0a63: Mounted from rdejana/mytestimagefordocker 
+317dbebecdcd: Mounted from rdejana/mytestimagefordocker 
+fe6d8881187d: Mounted from rdejana/mytestimagefordocker 
+23135df75b44: Mounted from rdejana/mytestimagefordocker 
+b43408d5f11b: Mounted from rdejana/mytestimagefordocker 
+latest: digest: sha256:eed27ee55faf1e9fe0a85eadd0e3146fa87876d8e8e25e3fd7c4fddd497a0768 size: 2624
+```
+Navigate back to DockerHub (https://hub.docker.com) and verify that you can see your image.  Now delete your local image, `docker rmi myimage` and now pull from DockerHub, `docker pull <yourdockerid>/myjupyter`.  You've successfully shared an image!
+
+## Part 7: CPU Architectures
+From your NX, run the command `docker pull rdejana/ubuntu`.  Now start a container with the command `docker run -ti --rm rdejana/ubuntu bash`.  Rather than a prompt, you'll get this error message: 
+```
+standard_init_linux.go:211: exec user process caused "exec format error"
+```
+
+If docker inspect is used to find the archicture, you'll see that the image is an amd64 (x86_64).  Running `docker info` will show that your NX uses an aarch64 architecture.  While many DockerHub images provide multiple architectures, you'll need to make sure the image you want to use is supported on your NX.
+
+
+# GPU
+
+## Part 1: Configure runtime
+These must be run on the NX.  You'll want to run with a monitor attached.  Nvidia provides a runtime to enable Docker to use GPUs.  You can verify that the runtime is installed by running the command 
+`docker info | grep nvidia`.  You should see `Runtimes: nvidia runc`.  We'll be setting the runtime to be nvidia by default.  Edit the file `/etc/docker/daemon.json`, e.g. sudo `vi /etc/docker/daemon.json`, adding/setting the `default-runtime` to `nvidia`.
+```
+{
+    "runtimes": {
+        "nvidia": {
+            "path": "nvidia-container-runtime",
+            "runtimeArgs": []
+        }
+    },
+    "default-runtime": "nvidia"
+}
+```
+
+Reboot your NX and login when reboot is completed.  
+From a shell, run the following:
+```
+# Allow containers to communicate with Xorg
+$ sudo xhost +si:localuser:root
+$ sudo docker run --runtime nvidia --network host -it -e DISPLAY=$DISPLAY -v /tmp/.X11-unix/:/tmp/.X11-unix nvcr.io/nvidia/l4t-base:r32.3.1
+
+root@nano:/# apt-get update && apt-get install -y --no-install-recommends make g++
+root@nano:/# cp -r /usr/local/cuda/samples /tmp
+root@nano:/# cd /tmp/samples/5_Simulations/nbody
+root@nano:/# make
+root@nano:/# ./nbody
+```
+
+This will display a N-body simulation, running in a container and displaying on your UI.
+
+## Part 2: TensorFlow
+
+
+# Kuberenetes
+
+## Part 1: Install and verify Kubernetes
+
+## Part 2: Kubernetes and GPU.
