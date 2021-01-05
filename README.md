@@ -121,7 +121,7 @@ When done, you can remove the image with the command `docker rmi hello-world:lat
 | docker run --name <name> <imageName> | Run an image as a container, using the specified name for the container. |
 | docker run --rm <imageName> | Run an image as a conatiner and automatically delete it when it exits. |
 
-Part 4: Interacting with a container
+## Part 4: Interacting with a container
 
 You'll now see a slightly more interesting example using the Ubuntu base image.  You'll start by running the command `docker pull ubuntu:latest`.  This will explictly download the image for you, making sure you have the most up to date version.  After the download is complete, run the command `docker run --name ubuntu --rm -it ubuntu bash`.  The `-it` option enable interactive mode and allocates a pseudo-TTY.  This allows us to interact with the container process.  The `bash` command tells docker to run the bash shell as the container's process.  This command will give you a shell that looks similar to 
 ```
@@ -211,11 +211,92 @@ Close out your containers and then delete your network with the command `docker 
 | docker run --network ... | Set the container's network |
 | docker inspect <name> | Return low-level information on Docker objects |
 
-networking example -> having 2 containers talk...
-
-
-Part 5: Persistent files
+## Part 5: More netowrking and Persistent files##
 Note, this is just an example.  For production applications, the files used here should be baked into the image.
-Nginx example...create index.html.  use both bind and volume -> why vol??
 
-Part 6. Building and sharing your own custom image.
+In this example, we'll be working with Nginx, a robost HTTP server. You'll launch your instance with the following command `docker run -d --name web --hostname web --rm nginx`.  The `-d` option runs the container in detached mode.  This means the container is running in the background!
+
+```
+rdejana@nx:~$ docker run -d --name web --hostname web --rm nginx 
+Unable to find image 'nginx:latest' locally
+latest: Pulling from library/nginx
+c9648d7fcbb6: Pull complete 
+af2653e2da79: Pull complete 
+1af64ee707c7: Pull complete 
+3bdc08a2d3ea: Pull complete 
+fed23bd0d00d: Pull complete 
+Digest: sha256:4cf620a5c81390ee209398ecc18e5fb9dd0f5155cd82adcbae532fec94006fb9
+Status: Downloaded newer image for nginx:latest
+2d5a5aa602e5e3c6198ad3ae9733d33255c486fef1ef7a29e56bc42d6cadd9e1
+rdejana@nx:~$
+```
+
+You'll use the `exec` command to access the container.  Run `docker exec -ti web bash`.  This will attach us to the container and start a bash process for you to interact with.
+Once in the command, verify that Nginx is running by curling the server: `curl http://localhost` and you'll see:
+```
+root@web:/# curl http://localhost
+<!DOCTYPE html>
+<html>
+<head>
+<title>Welcome to nginx!</title>
+<style>
+    body {
+        width: 35em;
+        margin: 0 auto;
+        font-family: Tahoma, Verdana, Arial, sans-serif;
+    }
+</style>
+</head>
+<body>
+<h1>Welcome to nginx!</h1>
+<p>If you see this page, the nginx web server is successfully installed and
+working. Further configuration is required.</p>
+
+<p>For online documentation and support please refer to
+<a href="http://nginx.org/">nginx.org</a>.<br/>
+Commercial support is available at
+<a href="http://nginx.com/">nginx.com</a>.</p>
+
+<p><em>Thank you for using nginx.</em></p>
+</body>
+</html>
+```
+
+Now how to access this container from OUTSIDE the container? Exit out of the shell and stop the container with `docker stop web`.  Recreate the container with the command: 
+`docker run -d --name web --hostname web -p 8080:80 --rm nginx`.  The `-p #:#` maps a port on the host, 8080 in this case, to a port in the container, in this case 80.  From a web browser, access you NX, by name or IP on port 8080, eg. http://nx:8080 and you should get back your web page.
+
+You can run the command `docker logs web` to see container's output.
+```
+docker logs web
+/docker-entrypoint.sh: /docker-entrypoint.d/ is not empty, will attempt to perform configuration
+/docker-entrypoint.sh: Looking for shell scripts in /docker-entrypoint.d/
+/docker-entrypoint.sh: Launching /docker-entrypoint.d/10-listen-on-ipv6-by-default.sh
+10-listen-on-ipv6-by-default.sh: info: Getting the checksum of /etc/nginx/conf.d/default.conf
+10-listen-on-ipv6-by-default.sh: info: Enabled listen on IPv6 in /etc/nginx/conf.d/default.conf
+/docker-entrypoint.sh: Launching /docker-entrypoint.d/20-envsubst-on-templates.sh
+/docker-entrypoint.sh: Configuration complete; ready for start up
+192.168.1.199 - - [05/Jan/2021:15:51:26 +0000] "GET / HTTP/1.1" 200 612 "-" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_6) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0.2 Safari/605.1.15" "-"
+```
+
+You'll now customize the HTML page. By default, the HTML files are located in the directory `/usr/share/nginx/html`. You'll want to install VI (or another editor) (apt-get update && apt-get install -y vim).  Change to the HTML dir, and edit the fine index.html replacing the text with:
+```
+<!DOCTYPE html>
+<html>
+<head>
+<title>Hello World</title>
+</head>
+<body>
+<h1>Hello World from Docker and Nginx!</h1>
+</body>
+</html>
+```
+Save the file and access the web page again.  Now stop your container and start it again.  Notice that your changes are now gone.  This is because, when the contaienr is deleted, all of your changes are deleted.  We'll address this by creating a persistent file system.  On your host, create a directory were you'll want to store HTML.  Change to that directory and create the index.html file with the content you used before.  Now launch your container with the following:
+```
+docker run -d --name web --hostname web -p 8080:80 --rm  -v <your HTML directory>:/usr/share/nginx/html  nginx
+```
+replacing `<your HTML directory>` with your actual directory.  Access your page again and you'll see your changes!  You've created a container using a bind mount.  This is used to share content from your host to your container.  Another option is to use a volume.  A volume is a more power and portable solution, but one in which the "where" abastraced out. If you are intersted in volumes, see the Docker documentation.
+
+Stop your container.
+
+## Part 6. Building and sharing your own custom image.
+Using exiting containers is great, but the Docker also allows you to create and share your own images.  
