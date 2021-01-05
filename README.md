@@ -211,7 +211,7 @@ Close out your containers and then delete your network with the command `docker 
 | docker run --network ... | Set the container's network |
 | docker inspect <name> | Return low-level information on Docker objects |
 
-## Part 5: More netowrking and Persistent files##
+## Part 5: More netowrking and Persistent files
 Note, this is just an example.  For production applications, the files used here should be baked into the image.
 
 In this example, we'll be working with Nginx, a robost HTTP server. You'll launch your instance with the following command `docker run -d --name web --hostname web --rm nginx`.  The `-d` option runs the container in detached mode.  This means the container is running in the background!
